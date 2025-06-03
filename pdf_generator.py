@@ -64,6 +64,9 @@ class PDFGenerator:
         else:
             chinese_font = 'Helvetica'
         
+        # 为英文内容使用Helvetica字体
+        english_font = 'Helvetica'
+        
         # 标题样式
         title_style = ParagraphStyle(
             'CustomTitle',
@@ -78,7 +81,7 @@ class PDFGenerator:
             rightIndent=0
         )
         
-        # 正文样式
+        # 正文样式 - 使用Helvetica以确保英文字符正常显示
         content_style = ParagraphStyle(
             'CustomContent',
             parent=styles['Normal'],
@@ -86,11 +89,27 @@ class PDFGenerator:
             spaceAfter=8,
             spaceBefore=6,
             alignment=TA_LEFT,
-            fontName=chinese_font,
+            fontName='Helvetica',  # 使用Helvetica确保英文字符间距正常
             leading=16,  # 行间距
             leftIndent=12,
             rightIndent=12,
             firstLineIndent=24,  # 首行缩进
+            wordWrap='LTR'
+        )
+        
+        # 中文内容样式
+        chinese_content_style = ParagraphStyle(
+            'ChineseContent',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=8,
+            spaceBefore=6,
+            alignment=TA_LEFT,
+            fontName=chinese_font,
+            leading=16,
+            leftIndent=12,
+            rightIndent=12,
+            firstLineIndent=24,
             wordWrap='LTR'
         )
         
@@ -102,7 +121,7 @@ class PDFGenerator:
             spaceAfter=8,
             spaceBefore=4,
             alignment=TA_LEFT,
-            fontName=chinese_font,
+            fontName='Helvetica',
             leading=12,
             leftIndent=12,
             textColor='gray'
@@ -111,6 +130,7 @@ class PDFGenerator:
         return {
             'title': title_style,
             'content': content_style,
+            'chinese_content': chinese_content_style,
             'date': date_style
         }
     
@@ -241,18 +261,46 @@ class PDFGenerator:
                                 for sentence in sentences:
                                     if len(current_para + sentence) > 300:
                                         if current_para:
-                                            para_obj = Paragraph(current_para + "。", self.styles['content'])
+                                            # 检测当前段落的语言类型
+                                            chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', current_para))
+                                            total_chars = len(current_para)
+                                            
+                                            if total_chars > 0 and chinese_chars / total_chars > 0.3:
+                                                style = self.styles['chinese_content']
+                                            else:
+                                                style = self.styles['content']
+                                            
+                                            para_obj = Paragraph(current_para + "。", style)
                                             story.append(para_obj)
                                             story.append(Spacer(1, 4))
                                         current_para = sentence
                                     else:
                                         current_para += sentence + "。" if sentence else ""
                                 if current_para:
-                                    para_obj = Paragraph(current_para, self.styles['content'])
+                                    # 检测最后段落的语言类型
+                                    chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', current_para))
+                                    total_chars = len(current_para)
+                                    
+                                    if total_chars > 0 and chinese_chars / total_chars > 0.3:
+                                        style = self.styles['chinese_content']
+                                    else:
+                                        style = self.styles['content']
+                                    
+                                    para_obj = Paragraph(current_para, style)
                                     story.append(para_obj)
                                     story.append(Spacer(1, 4))
                             else:
-                                para_obj = Paragraph(para_text, self.styles['content'])
+                                # 检测文本是否主要是中文或英文
+                                chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', para_text))
+                                total_chars = len(para_text)
+                                
+                                # 如果中文字符占比超过30%，使用中文样式，否则使用英文样式
+                                if chinese_chars / total_chars > 0.3:
+                                    style = self.styles['chinese_content']
+                                else:
+                                    style = self.styles['content']
+                                
+                                para_obj = Paragraph(para_text, style)
                                 story.append(para_obj)
                                 story.append(Spacer(1, 4))
                 
