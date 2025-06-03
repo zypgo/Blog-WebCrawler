@@ -179,6 +179,21 @@ class PDFGenerator:
         content = content.replace('\u2028', '\n')  # 行分隔符
         content = content.replace('\u2029', '\n\n')  # 段落分隔符
         
+        # 移除或替换无法显示的特殊字符和emoji
+        # 移除emoji和特殊符号
+        content = re.sub(r'[\U0001F600-\U0001F64F]', '', content)  # 表情符号
+        content = re.sub(r'[\U0001F300-\U0001F5FF]', '', content)  # 符号和象形文字
+        content = re.sub(r'[\U0001F680-\U0001F6FF]', '', content)  # 交通和地图符号
+        content = re.sub(r'[\U0001F1E0-\U0001F1FF]', '', content)  # 旗帜
+        content = re.sub(r'[\U00002600-\U000027BF]', '', content)  # 杂项符号
+        content = re.sub(r'[\U0000FE00-\U0000FE0F]', '', content)  # 变异选择器
+        
+        # 移除其他可能导致显示问题的字符
+        content = re.sub(r'[\u2000-\u206F]', ' ', content)  # 通用标点
+        content = re.sub(r'[\u2070-\u209F]', '', content)   # 上标和下标
+        content = re.sub(r'[\u20A0-\u20CF]', '', content)   # 货币符号
+        content = re.sub(r'[\u2100-\u214F]', '', content)   # 字母式符号
+        
         # 修复英文单词连接问题
         # 在小写字母和大写字母之间添加空格
         content = re.sub(r'([a-z])([A-Z])', r'\1 \2', content)
