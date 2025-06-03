@@ -34,21 +34,23 @@ class BlogScraper:
             
             for link in article_links:
                 href = link.get('href', '')
-                # 过滤出文章链接 - 新格式是 blog/xxx 而不是 /blog/xxx
-                if href.startswith('blog/') and href != 'blog' and href != 'blog/':
-                    full_url = urljoin(self.base_url, href)
-                    
-                    # 查找父级article元素来获取标题
-                    article_element = link.find_parent('article')
-                    if article_element:
-                        title_element = article_element.find('h2')
-                        if title_element:
-                            title = title_element.get_text(strip=True)
-                            if title:
-                                articles.append({
-                                    'url': full_url,
-                                    'title': title
-                                })
+                # 确保href是字符串类型
+                if isinstance(href, str):
+                    # 过滤出文章链接 - 新格式是 blog/xxx 而不是 /blog/xxx
+                    if href.startswith('blog/') and href != 'blog' and href != 'blog/':
+                        full_url = urljoin(self.base_url, href)
+                        
+                        # 查找父级article元素来获取标题
+                        article_element = link.find_parent('article')
+                        if article_element:
+                            title_element = article_element.find('h2')
+                            if title_element:
+                                title = title_element.get_text(strip=True)
+                                if title:
+                                    articles.append({
+                                        'url': full_url,
+                                        'title': title
+                                    })
             
             # 去重
             seen_urls = set()

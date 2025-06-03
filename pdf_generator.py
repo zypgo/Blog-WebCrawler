@@ -48,6 +48,10 @@ class PDFGenerator:
         """设置文档样式"""
         styles = getSampleStyleSheet()
         
+        # 检查是否已注册中文字体
+        registered_fonts = pdfmetrics.getRegisteredFontNames()
+        has_chinese_font = 'Chinese' in registered_fonts
+        
         # 标题样式
         title_style = ParagraphStyle(
             'CustomTitle',
@@ -55,7 +59,7 @@ class PDFGenerator:
             fontSize=18,
             spaceAfter=20,
             alignment=TA_CENTER,
-            fontName='Chinese' if 'Chinese' in [f.fontName for f in pdfmetrics.getRegisteredFontNames()] else 'Helvetica-Bold'
+            fontName='Chinese' if has_chinese_font else 'Helvetica-Bold'
         )
         
         # 正文样式
@@ -65,7 +69,7 @@ class PDFGenerator:
             fontSize=12,
             spaceAfter=12,
             alignment=TA_LEFT,
-            fontName='Chinese' if 'Chinese' in [f.fontName for f in pdfmetrics.getRegisteredFontNames()] else 'Helvetica'
+            fontName='Chinese' if has_chinese_font else 'Helvetica'
         )
         
         # 日期样式
@@ -75,7 +79,7 @@ class PDFGenerator:
             fontSize=10,
             spaceAfter=10,
             alignment=TA_CENTER,
-            fontName='Chinese' if 'Chinese' in [f.fontName for f in pdfmetrics.getRegisteredFontNames()] else 'Helvetica'
+            fontName='Chinese' if has_chinese_font else 'Helvetica'
         )
         
         return {
