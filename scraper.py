@@ -10,8 +10,8 @@ import re
 
 logger = logging.getLogger(__name__)
 
-class BlogScraper:
-    def __init__(self, base_url="https://baoyu.io/blog"):
+class WebScraper:
+    def __init__(self, base_url):
         self.base_url = base_url
         self.session = requests.Session()
         self.session.headers.update({
@@ -19,7 +19,7 @@ class BlogScraper:
         })
         
     def get_article_links(self):
-        """获取博客首页所有文章链接"""
+        """获取网站的所有文章链接"""
         try:
             logger.info(f"正在获取文章链接: {self.base_url}")
             response = self.session.get(self.base_url, timeout=10)
@@ -29,28 +29,37 @@ class BlogScraper:
             soup = BeautifulSoup(response.content, 'html.parser')
             articles = []
             
-            # 查找所有文章链接 - 根据新的HTML结构调整选择器
-            article_links = soup.find_all('a', href=True)
+            # 通用的文章链接查找策略
+            # 1. 首先尝试常见的文章容器选择器
+            article_containers = soup.select('article, .article, .post, .entry, .content-item, .blog-post')
             
-            for link in article_links:
-                href = link.get('href', '')
-                # 确保href是字符串类型
-                if isinstance(href, str):
-                    # 过滤出文章链接 - 新格式是 blog/xxx 而不是 /blog/xxx
-                    if href.startswith('blog/') and href != 'blog' and href != 'blog/':
+            if article_containers:
+                # 如果找到文章容器，从中提取链接
+                for container in article_containers:
+                    link = container.find('a', href=True)
+                    if link:
+                        href = str(link.get('href', ''))
+                        if href and self._is_valid_article_link(href):
+                            full_url = urljoin(self.base_url, href)
+                            title = self._extract_title_from_container(container)
+                            if title:
+                                articles.append({
+                                    'url': full_url,
+                                    'title': title
+                                })
+            else:
+                # 如果没有找到文章容器，尝试查找所有链接并过滤
+                all_links = soup.find_all('a', href=True)
+                for link in all_links:
+                    href = str(link.get('href', ''))
+                    if href and self._is_valid_article_link(href):
                         full_url = urljoin(self.base_url, href)
-                        
-                        # 查找父级article元素来获取标题
-                        article_element = link.find_parent('article')
-                        if article_element:
-                            title_element = article_element.find('h2')
-                            if title_element:
-                                title = title_element.get_text(strip=True)
-                                if title:
-                                    articles.append({
-                                        'url': full_url,
-                                        'title': title
-                                    })
+                        title = link.get_text(strip=True) or self._extract_title_from_url(href)
+                        if title and len(title) > 5:  # 过滤掉太短的标题
+                            articles.append({
+                                'url': full_url,
+                                'title': title
+                            })
             
             # 去重
             seen_urls = set()
@@ -66,6 +75,55 @@ class BlogScraper:
         except Exception as e:
             logger.error(f"获取文章链接失败: {str(e)}")
             return []
+    
+    def _is_valid_article_link(self, href):
+        """判断链接是否可能是文章链接"""
+        if not href or href.startswith('#') or href.startswith('javascript:'):
+            return False
+        
+        # 排除常见的非文章链接
+        excluded_patterns = [
+            '/tag/', '/category/', '/archive/', '/about', '/contact',
+            '/login', '/register', '/search', '/feed', '/rss',
+            '.pdf', '.doc', '.jpg', '.png', '.gif', '.zip'
+        ]
+        
+        for pattern in excluded_patterns:
+            if pattern in href.lower():
+                return False
+        
+        return True
+    
+    def _extract_title_from_container(self, container):
+        """从容器中提取标题"""
+        # 尝试多种标题选择器
+        title_selectors = ['h1', 'h2', 'h3', '.title', '.post-title', '.entry-title', '.article-title']
+        
+        for selector in title_selectors:
+            title_element = container.select_one(selector)
+            if title_element:
+                title = title_element.get_text(strip=True)
+                if title and len(title) > 5:
+                    return title
+        
+        return None
+    
+    def _extract_title_from_url(self, href):
+        """从URL中提取可能的标题"""
+        # 从URL路径中提取标题
+        path = urlparse(href).path
+        segments = [seg for seg in path.split('/') if seg]
+        
+        if segments:
+            last_segment = segments[-1]
+            # 移除文件扩展名
+            if '.' in last_segment:
+                last_segment = last_segment.rsplit('.', 1)[0]
+            # 替换连字符和下划线为空格
+            title = last_segment.replace('-', ' ').replace('_', ' ')
+            return title.title()
+        
+        return None
     
     def extract_article_date(self, content):
         """从文章内容中提取日期"""

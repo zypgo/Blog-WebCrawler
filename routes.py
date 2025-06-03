@@ -4,7 +4,7 @@ from datetime import datetime, date
 from flask import render_template, request, jsonify, send_file, flash, redirect, url_for
 from app import app, db
 from models import ScrapeJob, Article
-from scraper import BlogScraper
+from scraper import WebScraper
 from pdf_generator import PDFGenerator, TXTGenerator
 import threading
 import time
@@ -32,17 +32,29 @@ def start_scrape():
     try:
         data = request.get_json()
         
-        # 解析日期
+        # 解析输入数据
+        target_url = data.get('target_url', '').strip()
         start_date_str = data.get('start_date')
-        end_date_str = data.get('end_date', datetime.now().strftime('%Y-%m-%d'))
+        end_date_str = data.get('end_date')
         output_format = data.get('output_format', 'pdf')
         
+        if not target_url:
+            return jsonify({
+                'success': False,
+                'message': '请输入目标网站URL'
+            }), 400
+        
+        # 确保URL格式正确
+        if not target_url.startswith(('http://', 'https://')):
+            target_url = 'https://' + target_url
+        
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else None
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else None
         
         # 创建抓取任务
         job = ScrapeJob(
-            start_date=start_date or date(2020, 1, 1),
+            target_url=target_url,
+            start_date=start_date,
             end_date=end_date,
             output_format=output_format,
             status='pending'

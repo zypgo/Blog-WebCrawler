@@ -3,8 +3,9 @@ from app import db
 
 class ScrapeJob(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    start_date = db.Column(db.Date, nullable=False)
-    end_date = db.Column(db.Date, nullable=False)
+    target_url = db.Column(db.String(1000), nullable=False)  # 目标网站URL
+    start_date = db.Column(db.Date, nullable=True)  # 开始日期可选
+    end_date = db.Column(db.Date, nullable=True)   # 结束日期可选
     output_format = db.Column(db.String(10), nullable=False)  # 'pdf' or 'txt'
     status = db.Column(db.String(20), default='pending')  # pending, running, completed, failed
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
