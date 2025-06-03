@@ -141,6 +141,8 @@ class PDFGenerator:
     
     def generate_pdf(self, articles, output_path, progress_callback=None):
         """生成PDF文件"""
+        temp_image_paths = []  # 在函数级别管理临时文件
+        
         try:
             logger.info(f"开始生成PDF: {output_path}")
             
@@ -195,10 +197,18 @@ class PDFGenerator:
                 
                 # 处理图片
                 images = article.get('images', [])
+                
                 for img_info in images[:3]:  # 限制每篇文章最多3张图片
                     img_path = self.download_and_process_image(img_info['url'])
-                    if img_path:
+                    if img_path and os.path.exists(img_path):
                         try:
+                            # 检查文件大小，避免添加太大的图片
+                            img_size = os.path.getsize(img_path)
+                            if img_size > 5 * 1024 * 1024:  # 5MB限制
+                                logger.warning(f"图片过大，跳过: {img_info['url']}")
+                                os.unlink(img_path)
+                                continue
+                            
                             img = Image(img_path, width=4*inch, height=3*inch)
                             story.append(img)
                             story.append(Spacer(1, 0.1*inch))
@@ -208,10 +218,13 @@ class PDFGenerator:
                             story.append(caption)
                             story.append(Spacer(1, 0.2*inch))
                             
-                            # 清理临时文件
-                            os.unlink(img_path)
+                            # 添加到临时文件列表，稍后清理
+                            temp_image_paths.append(img_path)
+                            
                         except Exception as e:
                             logger.error(f"添加图片失败: {str(e)}")
+                            if os.path.exists(img_path):
+                                os.unlink(img_path)
                 
                 # 文章分隔
                 story.append(Spacer(1, 0.5*inch))
@@ -222,10 +235,26 @@ class PDFGenerator:
             # 生成PDF
             doc.build(story)
             logger.info(f"PDF生成完成: {output_path}")
+            
+            # 清理所有临时图片文件
+            for temp_path in temp_image_paths:
+                try:
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                except Exception as e:
+                    logger.warning(f"清理临时文件失败: {temp_path}, {str(e)}")
+            
             return True
             
         except Exception as e:
             logger.error(f"生成PDF失败: {str(e)}")
+            # 确保清理临时文件
+            for temp_path in temp_image_paths:
+                try:
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                except Exception:
+                    pass
             raise
 
 class TXTGenerator:
