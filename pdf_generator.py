@@ -7,6 +7,7 @@ from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from io import BytesIO
 import requests
 from PIL import Image as PILImage
@@ -23,25 +24,25 @@ class PDFGenerator:
     def setup_fonts(self):
         """设置中文字体"""
         try:
-            # 尝试注册系统中文字体，如果失败则使用默认字体
-            font_paths = [
-                '/System/Library/Fonts/PingFang.ttc',  # macOS
-                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',  # Linux
-                'C:/Windows/Fonts/simsun.ttc',  # Windows
-                'C:/Windows/Fonts/msyh.ttc',  # Windows Microsoft YaHei
-            ]
-            
-            for font_path in font_paths:
-                if os.path.exists(font_path):
-                    try:
-                        pdfmetrics.registerFont(TTFont('Chinese', font_path))
-                        logger.info(f"成功注册中文字体: {font_path}")
-                        return
-                    except:
-                        continue
-            
-            logger.warning("未找到中文字体，将使用默认字体")
-            
+            # 注册Unicode CID字体，支持中文
+            pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
+            logger.info("成功注册中文字体: STSong-Light")
+            return
+        except Exception as e:
+            logger.warning(f"注册STSong-Light失败: {str(e)}")
+        
+        try:
+            # 备选方案：使用HeiseiMin-W3
+            pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
+            logger.info("成功注册中文字体: HeiseiMin-W3")
+            return
+        except Exception as e:
+            logger.warning(f"注册HeiseiMin-W3失败: {str(e)}")
+        
+        try:
+            # 最后备选：注册DejaVu字体作为Chinese
+            pdfmetrics.registerFont(TTFont('Chinese', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'))
+            logger.info("使用DejaVu字体作为备选")
         except Exception as e:
             logger.error(f"设置字体失败: {str(e)}")
     
@@ -49,9 +50,19 @@ class PDFGenerator:
         """设置文档样式"""
         styles = getSampleStyleSheet()
         
-        # 检查是否已注册中文字体
+        # 检查可用的中文字体
         registered_fonts = pdfmetrics.getRegisteredFontNames()
-        has_chinese_font = 'Chinese' in registered_fonts
+        chinese_font = None
+        
+        # 优先使用CID字体
+        if 'STSong-Light' in registered_fonts:
+            chinese_font = 'STSong-Light'
+        elif 'HeiseiMin-W3' in registered_fonts:
+            chinese_font = 'HeiseiMin-W3'
+        elif 'Chinese' in registered_fonts:
+            chinese_font = 'Chinese'
+        else:
+            chinese_font = 'Helvetica'
         
         # 标题样式
         title_style = ParagraphStyle(
@@ -60,7 +71,7 @@ class PDFGenerator:
             fontSize=18,
             spaceAfter=20,
             alignment=TA_CENTER,
-            fontName='Chinese' if has_chinese_font else 'Helvetica-Bold'
+            fontName=chinese_font
         )
         
         # 正文样式
@@ -70,7 +81,7 @@ class PDFGenerator:
             fontSize=12,
             spaceAfter=12,
             alignment=TA_LEFT,
-            fontName='Chinese' if has_chinese_font else 'Helvetica'
+            fontName=chinese_font
         )
         
         # 日期样式
@@ -80,7 +91,7 @@ class PDFGenerator:
             fontSize=10,
             spaceAfter=10,
             alignment=TA_CENTER,
-            fontName='Chinese' if has_chinese_font else 'Helvetica'
+            fontName=chinese_font
         )
         
         return {
