@@ -125,34 +125,82 @@ class WebScraper:
         
         return None
     
-    def extract_article_date(self, content):
+    def extract_article_date(self, content, soup=None):
         """从文章内容中提取日期"""
         try:
-            # 尝试多种日期格式
-            date_patterns = [
-                r'(\d{4}年\d{1,2}月\d{1,2}日)',
-                r'(\d{4}-\d{1,2}-\d{1,2})',
-                r'(\d{1,2}/\d{1,2}/\d{4})',
-                r'(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}',
-                r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4}'
-            ]
+            # 首先尝试从HTML结构中提取日期
+            if soup:
+                # 常见的日期元素选择器
+                date_selectors = [
+                    'time[datetime]', '.date', '.published', '.post-date', 
+                    '.entry-date', '.article-date', '.publish-date',
+                    'meta[property="article:published_time"]',
+                    'meta[name="publishdate"]'
+                ]
+                
+                for selector in date_selectors:
+                    date_element = soup.select_one(selector)
+                    if date_element:
+                        # 尝试从datetime属性获取
+                        datetime_attr = date_element.get('datetime') or date_element.get('content')
+                        if datetime_attr:
+                            try:
+                                # 解析ISO格式日期
+                                if 'T' in datetime_attr:
+                                    return datetime.fromisoformat(datetime_attr.split('T')[0]).date()
+                                else:
+                                    return datetime.strptime(datetime_attr[:10], '%Y-%m-%d').date()
+                            except:
+                                pass
+                        
+                        # 尝试从文本内容获取
+                        date_text = date_element.get_text(strip=True)
+                        if date_text:
+                            parsed_date = self._parse_date_text(date_text)
+                            if parsed_date:
+                                return parsed_date
             
-            for pattern in date_patterns:
-                match = re.search(pattern, content)
-                if match:
-                    date_str = match.group(1)
-                    try:
-                        # 尝试解析日期
-                        if '年' in date_str:
-                            date_str = date_str.replace('年', '-').replace('月', '-').replace('日', '')
-                        return datetime.strptime(date_str, '%Y-%m-%d').date()
-                    except:
-                        continue
+            # 从文本内容中提取日期
+            return self._parse_date_text(content)
             
-            return None
         except Exception as e:
             logger.error(f"提取日期失败: {str(e)}")
             return None
+    
+    def _parse_date_text(self, text):
+        """解析文本中的日期"""
+        # 扩展的日期格式模式
+        date_patterns = [
+            # ISO格式
+            (r'(\d{4}-\d{1,2}-\d{1,2})', '%Y-%m-%d'),
+            # 中文格式
+            (r'(\d{4})年(\d{1,2})月(\d{1,2})日', None),
+            # 英文格式
+            (r'(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})', '%B %d %Y'),
+            (r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})', '%b %d %Y'),
+            # 美式格式
+            (r'(\d{1,2})/(\d{1,2})/(\d{4})', '%m/%d/%Y'),
+            # 欧式格式
+            (r'(\d{1,2})\.(\d{1,2})\.(\d{4})', '%d.%m.%Y'),
+        ]
+        
+        for pattern, format_str in date_patterns:
+            match = re.search(pattern, text)
+            if match:
+                try:
+                    if format_str is None:  # 中文格式特殊处理
+                        if '年' in match.group(0):
+                            year, month, day = match.groups()
+                            return datetime(int(year), int(month), int(day)).date()
+                    else:
+                        if len(match.groups()) == 1:
+                            return datetime.strptime(match.group(1), format_str).date()
+                        else:
+                            return datetime.strptime(match.group(0), format_str).date()
+                except:
+                    continue
+        
+        return None
     
     def scrape_article(self, article_url):
         """抓取单篇文章内容"""
@@ -185,7 +233,7 @@ class WebScraper:
                 title = "无标题"
             
             # 提取发布日期
-            published_date = self.extract_article_date(text_content)
+            published_date = self.extract_article_date(text_content, soup)
             
             # 查找并下载图片
             images = self.extract_images(soup, article_url)
@@ -263,13 +311,20 @@ class WebScraper:
                 
                 if article_data:
                     # 检查日期过滤
-                    if start_date and article_data['published_date']:
-                        if article_data['published_date'] < start_date:
-                            continue
+                    published_date = article_data.get('published_date')
                     
-                    if end_date and article_data['published_date']:
-                        if article_data['published_date'] > end_date:
-                            continue
+                    # 如果设置了日期过滤但文章没有日期信息，记录日志但仍然包含该文章
+                    if start_date or end_date:
+                        if published_date:
+                            if start_date and published_date < start_date:
+                                logger.info(f"跳过文章（早于开始日期）: {article_data['title']} - {published_date}")
+                                continue
+                            
+                            if end_date and published_date > end_date:
+                                logger.info(f"跳过文章（晚于结束日期）: {article_data['title']} - {published_date}")
+                                continue
+                        else:
+                            logger.warning(f"文章无法提取日期，将包含在结果中: {article_data['title']}")
                     
                     articles.append(article_data)
                 
