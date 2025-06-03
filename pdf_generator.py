@@ -81,7 +81,7 @@ class PDFGenerator:
             rightIndent=0
         )
         
-        # 正文样式 - 使用Helvetica以确保英文字符正常显示
+        # 正文样式 - 统一使用中文字体，确保字符兼容性
         content_style = ParagraphStyle(
             'CustomContent',
             parent=styles['Normal'],
@@ -89,7 +89,7 @@ class PDFGenerator:
             spaceAfter=8,
             spaceBefore=6,
             alignment=TA_LEFT,
-            fontName='Helvetica',  # 使用Helvetica确保英文字符间距正常
+            fontName=chinese_font,  # 统一使用中文字体以避免字符显示问题
             leading=16,  # 行间距
             leftIndent=12,
             rightIndent=12,
@@ -97,7 +97,7 @@ class PDFGenerator:
             wordWrap='LTR'
         )
         
-        # 中文内容样式
+        # 中文内容样式（与content_style保持一致）
         chinese_content_style = ParagraphStyle(
             'ChineseContent',
             parent=styles['Normal'],
@@ -121,7 +121,7 @@ class PDFGenerator:
             spaceAfter=8,
             spaceBefore=4,
             alignment=TA_LEFT,
-            fontName='Helvetica',
+            fontName=chinese_font,  # 统一使用中文字体
             leading=12,
             leftIndent=12,
             textColor='gray'
@@ -179,20 +179,25 @@ class PDFGenerator:
         content = content.replace('\u2028', '\n')  # 行分隔符
         content = content.replace('\u2029', '\n\n')  # 段落分隔符
         
-        # 移除或替换无法显示的特殊字符和emoji
-        # 移除emoji和特殊符号
-        content = re.sub(r'[\U0001F600-\U0001F64F]', '', content)  # 表情符号
-        content = re.sub(r'[\U0001F300-\U0001F5FF]', '', content)  # 符号和象形文字
-        content = re.sub(r'[\U0001F680-\U0001F6FF]', '', content)  # 交通和地图符号
-        content = re.sub(r'[\U0001F1E0-\U0001F1FF]', '', content)  # 旗帜
-        content = re.sub(r'[\U00002600-\U000027BF]', '', content)  # 杂项符号
-        content = re.sub(r'[\U0000FE00-\U0000FE0F]', '', content)  # 变异选择器
+        # 更严格的字符过滤 - 只保留基本字符
+        # 保留基本拉丁字母、数字、中文字符、基本标点符号
+        allowed_chars = []
+        for char in content:
+            code = ord(char)
+            # 基本拉丁字母和数字 (0-127)
+            # 中文字符 (19968-40959)
+            # 基本标点符号
+            if (code <= 127 or  # ASCII字符
+                (19968 <= code <= 40959) or  # 中文字符
+                char in '，。！？；：""''（）【】《》、—…\n\r\t '):
+                allowed_chars.append(char)
+            else:
+                # 将不支持的字符替换为空格或删除
+                if char.isspace():
+                    allowed_chars.append(' ')
+                # 其他字符直接删除
         
-        # 移除其他可能导致显示问题的字符
-        content = re.sub(r'[\u2000-\u206F]', ' ', content)  # 通用标点
-        content = re.sub(r'[\u2070-\u209F]', '', content)   # 上标和下标
-        content = re.sub(r'[\u20A0-\u20CF]', '', content)   # 货币符号
-        content = re.sub(r'[\u2100-\u214F]', '', content)   # 字母式符号
+        content = ''.join(allowed_chars)
         
         # 修复英文单词连接问题
         # 在小写字母和大写字母之间添加空格
@@ -280,10 +285,8 @@ class PDFGenerator:
                                             chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', current_para))
                                             total_chars = len(current_para)
                                             
-                                            if total_chars > 0 and chinese_chars / total_chars > 0.3:
-                                                style = self.styles['chinese_content']
-                                            else:
-                                                style = self.styles['content']
+                                            # 统一使用content样式
+                                            style = self.styles['content']
                                             
                                             para_obj = Paragraph(current_para + "。", style)
                                             story.append(para_obj)
@@ -292,14 +295,8 @@ class PDFGenerator:
                                     else:
                                         current_para += sentence + "。" if sentence else ""
                                 if current_para:
-                                    # 检测最后段落的语言类型
-                                    chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', current_para))
-                                    total_chars = len(current_para)
-                                    
-                                    if total_chars > 0 and chinese_chars / total_chars > 0.3:
-                                        style = self.styles['chinese_content']
-                                    else:
-                                        style = self.styles['content']
+                                    # 统一使用content样式
+                                    style = self.styles['content']
                                     
                                     para_obj = Paragraph(current_para, style)
                                     story.append(para_obj)
@@ -309,11 +306,8 @@ class PDFGenerator:
                                 chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', para_text))
                                 total_chars = len(para_text)
                                 
-                                # 如果中文字符占比超过30%，使用中文样式，否则使用英文样式
-                                if chinese_chars / total_chars > 0.3:
-                                    style = self.styles['chinese_content']
-                                else:
-                                    style = self.styles['content']
+                                # 统一使用content样式，避免字体不一致问题
+                                style = self.styles['content']
                                 
                                 para_obj = Paragraph(para_text, style)
                                 story.append(para_obj)
