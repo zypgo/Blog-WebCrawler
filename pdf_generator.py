@@ -159,12 +159,19 @@ class PDFGenerator:
         content = content.replace('\u2028', '\n')  # 行分隔符
         content = content.replace('\u2029', '\n\n')  # 段落分隔符
         
+        # 修复英文单词连接问题
+        # 在小写字母和大写字母之间添加空格
+        content = re.sub(r'([a-z])([A-Z])', r'\1 \2', content)
+        # 在字母和数字之间添加空格
+        content = re.sub(r'([a-zA-Z])(\d)', r'\1 \2', content)
+        content = re.sub(r'(\d)([a-zA-Z])', r'\1 \2', content)
+        # 在标点符号后添加空格（如果后面直接跟字母）
+        content = re.sub(r'([.!?])([A-Z])', r'\1 \2', content)
+        content = re.sub(r'([,;:])([a-zA-Z])', r'\1 \2', content)
+        
         # 规范化空白字符
         content = re.sub(r'\s+', ' ', content)  # 多个空格合并为一个
         content = re.sub(r'\n\s*\n', '\n\n', content)  # 多个换行合并
-        
-        # 为英文单词间添加合适的分隔
-        content = re.sub(r'([a-zA-Z])([A-Z])', r'\1 \2', content)
         
         # 转义XML特殊字符
         content = content.replace('&', '&amp;')
