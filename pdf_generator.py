@@ -68,30 +68,44 @@ class PDFGenerator:
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Title'],
-            fontSize=18,
+            fontSize=16,
             spaceAfter=20,
+            spaceBefore=12,
             alignment=TA_CENTER,
-            fontName=chinese_font
+            fontName=chinese_font,
+            leading=20,  # 行间距
+            leftIndent=0,
+            rightIndent=0
         )
         
         # 正文样式
         content_style = ParagraphStyle(
             'CustomContent',
             parent=styles['Normal'],
-            fontSize=12,
-            spaceAfter=12,
+            fontSize=11,
+            spaceAfter=8,
+            spaceBefore=6,
             alignment=TA_LEFT,
-            fontName=chinese_font
+            fontName=chinese_font,
+            leading=16,  # 行间距
+            leftIndent=12,
+            rightIndent=12,
+            firstLineIndent=24,  # 首行缩进
+            wordWrap='LTR'
         )
         
         # 日期样式
         date_style = ParagraphStyle(
             'CustomDate',
             parent=styles['Normal'],
-            fontSize=10,
-            spaceAfter=10,
-            alignment=TA_CENTER,
-            fontName=chinese_font
+            fontSize=9,
+            spaceAfter=8,
+            spaceBefore=4,
+            alignment=TA_LEFT,
+            fontName=chinese_font,
+            leading=12,
+            leftIndent=12,
+            textColor='gray'
         )
         
         return {
@@ -142,13 +156,22 @@ class PDFGenerator:
         # 清理特殊字符
         content = content.replace('\u00a0', ' ')  # 替换不间断空格
         content = content.replace('\u200b', '')   # 移除零宽空格
+        content = content.replace('\u2028', '\n')  # 行分隔符
+        content = content.replace('\u2029', '\n\n')  # 段落分隔符
+        
+        # 规范化空白字符
+        content = re.sub(r'\s+', ' ', content)  # 多个空格合并为一个
+        content = re.sub(r'\n\s*\n', '\n\n', content)  # 多个换行合并
+        
+        # 为英文单词间添加合适的分隔
+        content = re.sub(r'([a-zA-Z])([A-Z])', r'\1 \2', content)
         
         # 转义XML特殊字符
         content = content.replace('&', '&amp;')
         content = content.replace('<', '&lt;')
         content = content.replace('>', '&gt;')
         
-        return content
+        return content.strip()
     
     def generate_pdf(self, articles, output_path, progress_callback=None):
         """生成PDF文件"""
@@ -198,13 +221,33 @@ class PDFGenerator:
                 if content:
                     # 清理HTML内容
                     content = self.clean_html_content(content)
-                    # 将内容按段落分割
+                    # 将内容按段落分割，每段不超过一定长度
                     paragraphs = content.split('\n\n')
                     for para in paragraphs:
                         if para.strip():
-                            para_obj = Paragraph(para.strip(), self.styles['content'])
-                            story.append(para_obj)
-                            story.append(Spacer(1, 6))
+                            # 限制段落长度，避免单行过长
+                            para_text = para.strip()
+                            if len(para_text) > 500:
+                                # 按句号分割长段落
+                                sentences = para_text.split('。')
+                                current_para = ""
+                                for sentence in sentences:
+                                    if len(current_para + sentence) > 300:
+                                        if current_para:
+                                            para_obj = Paragraph(current_para + "。", self.styles['content'])
+                                            story.append(para_obj)
+                                            story.append(Spacer(1, 4))
+                                        current_para = sentence
+                                    else:
+                                        current_para += sentence + "。" if sentence else ""
+                                if current_para:
+                                    para_obj = Paragraph(current_para, self.styles['content'])
+                                    story.append(para_obj)
+                                    story.append(Spacer(1, 4))
+                            else:
+                                para_obj = Paragraph(para_text, self.styles['content'])
+                                story.append(para_obj)
+                                story.append(Spacer(1, 4))
                 
                 # 处理图片
                 images = article.get('images', [])
