@@ -28,19 +28,20 @@ async function handleScrapeSubmit(event) {
     
     const formData = new FormData(event.target);
     const data = {
+        target_url: formData.get('target_url'),
         start_date: formData.get('start_date') || null,
-        end_date: formData.get('end_date'),
+        end_date: formData.get('end_date') || null,
         output_format: formData.get('output_format')
     };
     
     // 验证数据
-    if (!data.end_date) {
-        showAlert('请选择结束日期', 'warning');
+    if (!data.target_url) {
+        showAlert('请输入目标网站URL', 'warning');
         return;
     }
     
     // 如果开始日期晚于结束日期
-    if (data.start_date && new Date(data.start_date) > new Date(data.end_date)) {
+    if (data.start_date && data.end_date && new Date(data.start_date) > new Date(data.end_date)) {
         showAlert('开始日期不能晚于结束日期', 'warning');
         return;
     }

@@ -6,11 +6,11 @@
         <!-- 主标题 -->
         <div class="text-center mb-5">
             <h1 class="display-4 mb-3">
-                <i class="fas fa-blog text-primary me-3"></i>
-                博客爬虫工具
+                <i class="fas fa-spider text-primary me-3"></i>
+                通用网页爬虫工具
             </h1>
             <p class="lead text-muted">
-                自动抓取 baoyu.io 博客的所有文章并导出为PDF或TXT格式
+                自动抓取任意网站的文章内容并导出为PDF或TXT格式
             </p>
         </div>
 
@@ -24,11 +24,21 @@
             </div>
             <div class="card-body">
                 <form id="scrapeForm">
+                    <div class="mb-3">
+                        <label for="targetUrl" class="form-label">
+                            <i class="fas fa-link me-1"></i>
+                            目标网站URL
+                        </label>
+                        <input type="url" class="form-control" id="targetUrl" name="target_url" 
+                               placeholder="https://example.com" required>
+                        <div class="form-text">输入要抓取的网站首页或文章列表页</div>
+                    </div>
+                    
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="startDate" class="form-label">
                                 <i class="fas fa-calendar-alt me-1"></i>
-                                开始日期
+                                开始日期（可选）
                             </label>
                             <input type="date" class="form-control" id="startDate" name="start_date">
                             <div class="form-text">留空则抓取所有文章</div>
@@ -36,9 +46,10 @@
                         <div class="col-md-6 mb-3">
                             <label for="endDate" class="form-label">
                                 <i class="fas fa-calendar-check me-1"></i>
-                                结束日期
+                                结束日期（可选）
                             </label>
-                            <input type="date" class="form-control" id="endDate" name="end_date" required>
+                            <input type="date" class="form-control" id="endDate" name="end_date">
+                            <div class="form-text">留空则不限制结束日期</div>
                         </div>
                     </div>
                     
@@ -142,6 +153,7 @@
                     <table class="table table-hover">
                         <thead>
                             <tr>
+                                <th>目标网站</th>
                                 <th>日期范围</th>
                                 <th>格式</th>
                                 <th>状态</th>
@@ -154,9 +166,20 @@
                             {% for job in recent_jobs %}
                             <tr>
                                 <td>
-                                    {{ job.start_date.strftime('%Y-%m-%d') }} 
-                                    至 
-                                    {{ job.end_date.strftime('%Y-%m-%d') }}
+                                    <small>{{ job.target_url }}</small>
+                                </td>
+                                <td>
+                                    {% if job.start_date and job.end_date %}
+                                        {{ job.start_date.strftime('%Y-%m-%d') }} 
+                                        至 
+                                        {{ job.end_date.strftime('%Y-%m-%d') }}
+                                    {% elif job.start_date %}
+                                        从 {{ job.start_date.strftime('%Y-%m-%d') }}
+                                    {% elif job.end_date %}
+                                        至 {{ job.end_date.strftime('%Y-%m-%d') }}
+                                    {% else %}
+                                        全部文章
+                                    {% endif %}
                                 </td>
                                 <td>
                                     {% if job.output_format == 'pdf' %}
@@ -219,22 +242,22 @@
                         <div class="text-primary mb-2">
                             <i class="fas fa-calendar-alt fa-2x"></i>
                         </div>
-                        <h6>设置日期</h6>
-                        <p class="text-muted small">选择要抓取的文章日期范围，留空开始日期将抓取所有文章</p>
+        <h6>输入网址</h6>
+                        <p class="text-muted small">输入要抓取的网站URL，支持任意博客或新闻网站</p>
                     </div>
                     <div class="col-md-4 text-center mb-3">
                         <div class="text-success mb-2">
-                            <i class="fas fa-file-export fa-2x"></i>
+                            <i class="fas fa-calendar-alt fa-2x"></i>
                         </div>
-                        <h6>选择格式</h6>
-                        <p class="text-muted small">PDF格式包含图片适合阅读，TXT格式体积小方便处理</p>
+                        <h6>设置时间</h6>
+                        <p class="text-muted small">可选择日期范围过滤文章，留空将抓取全部内容</p>
                     </div>
                     <div class="col-md-4 text-center mb-3">
                         <div class="text-info mb-2">
                             <i class="fas fa-download fa-2x"></i>
                         </div>
-                        <h6>下载文件</h6>
-                        <p class="text-muted small">等待爬取完成后即可下载生成的文件到本地</p>
+                        <h6>导出下载</h6>
+                        <p class="text-muted small">支持PDF和TXT格式，完成后自动生成下载链接</p>
                     </div>
                 </div>
             </div>
@@ -245,8 +268,8 @@
 
 {% block scripts %}
 <script>
-// 设置默认结束日期为今天
-document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
+// 设置默认结束日期为今天（可选）
+// document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
 
 // 下载历史文件
 function downloadFile(jobId) {

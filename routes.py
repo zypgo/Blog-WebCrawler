@@ -119,8 +119,9 @@ def list_jobs():
     for job in jobs:
         jobs_data.append({
             'id': job.id,
-            'start_date': job.start_date.strftime('%Y-%m-%d'),
-            'end_date': job.end_date.strftime('%Y-%m-%d'),
+            'target_url': job.target_url,
+            'start_date': job.start_date.strftime('%Y-%m-%d') if job.start_date else None,
+            'end_date': job.end_date.strftime('%Y-%m-%d') if job.end_date else None,
             'output_format': job.output_format,
             'status': job.status,
             'articles_count': job.articles_count,
@@ -165,7 +166,7 @@ def run_scrape_job(job_id):
             })
             
             # 创建爬虫实例
-            scraper = BlogScraper()
+            scraper = WebScraper(job.target_url)
             
             # 定义进度回调函数
             def progress_callback(current, total, message):
@@ -183,13 +184,12 @@ def run_scrape_job(job_id):
             
             # 保存文章到数据库
             for article_data in articles:
-                article = Article(
-                    title=article_data['title'],
-                    url=article_data['url'],
-                    published_date=article_data.get('published_date'),
-                    content=article_data.get('content', ''),
-                    job_id=job_id
-                )
+                article = Article()
+                article.title = article_data['title']
+                article.url = article_data['url']
+                article.published_date = article_data.get('published_date')
+                article.content = article_data.get('content', '')
+                article.job_id = job_id
                 db.session.add(article)
             
             job.articles_count = len(articles)
