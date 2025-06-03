@@ -11,6 +11,7 @@ from io import BytesIO
 import requests
 from PIL import Image as PILImage
 import tempfile
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,25 @@ class PDFGenerator:
             logger.error(f"处理图片失败 {img_url}: {str(e)}")
             return None
     
+    def clean_html_content(self, content):
+        """清理HTML内容，移除不支持的标签"""
+        if not content:
+            return content
+        
+        # 移除HTML标签但保留内容
+        content = re.sub(r'<[^>]+>', '', content)
+        
+        # 清理特殊字符
+        content = content.replace('\u00a0', ' ')  # 替换不间断空格
+        content = content.replace('\u200b', '')   # 移除零宽空格
+        
+        # 转义XML特殊字符
+        content = content.replace('&', '&amp;')
+        content = content.replace('<', '&lt;')
+        content = content.replace('>', '&gt;')
+        
+        return content
+    
     def generate_pdf(self, articles, output_path, progress_callback=None):
         """生成PDF文件"""
         try:
@@ -163,6 +183,8 @@ class PDFGenerator:
                 # 文章内容
                 content = article.get('content', '')
                 if content:
+                    # 清理HTML内容
+                    content = self.clean_html_content(content)
                     # 将内容按段落分割
                     paragraphs = content.split('\n\n')
                     for para in paragraphs:
