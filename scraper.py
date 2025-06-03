@@ -29,20 +29,26 @@ class BlogScraper:
             soup = BeautifulSoup(response.content, 'html.parser')
             articles = []
             
-            # 查找所有文章链接 - 根据HTML结构调整选择器
+            # 查找所有文章链接 - 根据新的HTML结构调整选择器
             article_links = soup.find_all('a', href=True)
             
             for link in article_links:
                 href = link.get('href', '')
-                # 过滤出文章链接
-                if '/blog/' in href and href != '/blog' and href != '/blog/':
+                # 过滤出文章链接 - 新格式是 blog/xxx 而不是 /blog/xxx
+                if href.startswith('blog/') and href != 'blog' and href != 'blog/':
                     full_url = urljoin(self.base_url, href)
-                    title = link.get_text(strip=True)
-                    if title:  # 只保留有标题的链接
-                        articles.append({
-                            'url': full_url,
-                            'title': title
-                        })
+                    
+                    # 查找父级article元素来获取标题
+                    article_element = link.find_parent('article')
+                    if article_element:
+                        title_element = article_element.find('h2')
+                        if title_element:
+                            title = title_element.get_text(strip=True)
+                            if title:
+                                articles.append({
+                                    'url': full_url,
+                                    'title': title
+                                })
             
             # 去重
             seen_urls = set()
